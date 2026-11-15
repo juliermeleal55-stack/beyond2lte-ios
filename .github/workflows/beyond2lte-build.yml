@@ -1,0 +1,223 @@
+name: beyond2lte XNU BOOT build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beyond2lte-ios-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  kernel:
+    name: Build pinned XNU kernel (macOS)
+    runs-on: macos-26
+    timeout-minutes: 180
+    steps:
+      - name: Checkout this fork
+        uses: actions/checkout@v4
+
+      - name: Check Apple toolchain and required private inputs
+        shell: bash
+        env:
+          KDK_URL: ${{ secrets.B2L_KDK_ARCHIVE_URL }}
+          DEPS_URL: ${{ secrets.B2L_DEPS_ARCHIVE_URL }}
+        run: |
+          set -euo pipefail
+          [[ "$(uname -m)" == "arm64" ]] || { echo "::error::The XNU job requires an Apple Silicon runner."; exit 1; }
+          [[ -n "$KDK_URL" ]] || { echo "::error::Add secret B2L_KDK_ARCHIVE_URL."; exit 1; }
+          [[ -n "$DEPS_URL" ]] || { echo "::error::Add secret B2L_DEPS_ARCHIVE_URL."; exit 1; }
+          xcodebuild -version
+          xcodebuild -showsdks
+          xcodebuild -version | grep -q 'Xcode 27.1' || { echo "::error::Xcode 27.1 is required by docs/build.md."; exit 1; }
+          xcodebuild -showsdks | grep -q 'iOS 26.5' || { echo "::error::iPhoneOS SDK 26.5 is missing."; exit 1; }
+          xcodebuild -showsdks | grep -q 'macOS 27' || { echo "::error::macOS 27 SDK is missing."; exit 1; }
+
+      - name: Download external Apple KDK and B2L dependencies
+        shell: bash
+        env:
+          KDK_URL: ${{ secrets.B2L_KDK_ARCHIVE_URL }}
+          KDK_TOKEN: ${{ secrets.B2L_KDK_ARCHIVE_TOKEN }}
+          DEPS_URL: ${{ secrets.B2L_DEPS_ARCHIVE_URL }}
+          DEPS_TOKEN: ${{ secrets.B2L_DEPS_ARCHIVE_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/kdk" "$RUNNER_TEMP/b2l-deps"
+          download() {
+            local url="$1" token="$2" output="$3"
+            if [[ -n "$token" ]]; then
+              curl --fail --location --retry 3 -H "Authorization: Bearer $token" "$url" -o "$output"
+            else
+              curl --fail --location --retry 3 "$url" -o "$output"
+            fi
+          }
+          download "$KDK_URL" "$KDK_TOKEN" "$RUNNER_TEMP/kdk.tar.gz"
+          download "$DEPS_URL" "$DEPS_TOKEN" "$RUNNER_TEMP/b2l-deps.tar.gz"
+          tar -xzf "$RUNNER_TEMP/kdk.tar.gz" -C "$RUNNER_TEMP/kdk"
+          tar -xzf "$RUNNER_TEMP/b2l-deps.tar.gz" -C "$RUNNER_TEMP/b2l-deps"
+          test -f "$RUNNER_TEMP/b2l-deps/usr/local/libexec/availability.pl"
+          test -f "$RUNNER_TEMP/b2l-deps/usr/local/lib/kernel/libfirehose_kernel.a"
+          echo "KDKROOT=$RUNNER_TEMP/kdk" >> "$GITHUB_ENV"
+          echo "B2L_DEPSROOT=$RUNNER_TEMP/b2l-deps" >> "$GITHUB_ENV"
+
+      - name: Fetch and prepare pinned XNU
+        run: |
+          scripts/fetch-xnu.sh
+          scripts/prepare-xnu.sh
+
+      - name: Compile standalone B2L kernel
+        env:
+          BUILD_JOBS: "4"
+        run: |
+          set -euo pipefail
+          scripts/build-kernel.sh CWARNFLAGS=-w CXXWARNFLAGS=-w
+          mkdir -p out/kernel
+          image="$(find out/xnu -type f -name 'mach.development.b2l' -print -quit)"
+          test -n "$image"
+          cp "$image" out/kernel/mach.development.b2l
+          test -s out/kernel/mach.development.b2l
+
+      - name: Upload XNU kernel
+        uses: actions/upload-artifact@v4
+        with:
+          name: b2l-xnu-kernel
+          path: out/kernel/mach.development.b2l
+          if-no-files-found: error
+          retention-days: 7
+
+  firmware:
+    name: Build beyond2lte UEFI firmware (Linux)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Checkout XNU builder
+        uses: actions/checkout@v4
+        with:
+          path: xnu-builder
+
+      - name: Checkout beyond2lte UEFI overlay
+        uses: actions/checkout@v4
+        with:
+          repository: orhunnx/beyond2lte-uefi
+          ref: master
+          path: b2l-uefi
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git git-lfs python3 python3-venv python3-pip clang llvm lld nasm acpica-tools device-tree-compiler rsync uuid-dev libssl-dev libuuid1 zlib1g-dev liblzma-dev
+
+      - name: Clone Mu-Silicium and prepare the board overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --recursive https://github.com/Project-Silicium/Mu-Silicium.git "$RUNNER_TEMP/Mu-Silicium"
+          git -C "$RUNNER_TEMP/Mu-Silicium" submodule update --init --recursive
+          cp -a b2l-uefi/mu-silicium-overlay/. "$RUNNER_TEMP/Mu-Silicium/"
+          test -s "$RUNNER_TEMP/Mu-Silicium/Resources/DTBs/beyond2lte.dtb"
+          test -s "$RUNNER_TEMP/Mu-Silicium/BootShim/BootShim.S"
+          echo "MU_WORK_TREE=$RUNNER_TEMP/Mu-Silicium" >> "$GITHUB_ENV"
+
+      - name: Install Mu Python dependencies and build native BaseTools
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$MU_WORK_TREE"
+          python3 -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install -r pip-requirements.txt
+          make -C Mu_Basecore/BaseTools
+          for tool in clang llvm-lib llvm-rc lld-link; do
+            command -v "$tool" >/dev/null || { echo "::error::Missing required LLVM tool: $tool"; exit 1; }
+          done
+
+      - name: Run board layout safety audits
+        working-directory: b2l-uefi
+        run: |
+          python3 tools_uefi_layout_check.py
+          python3 tools_reserved_memory_audit.py --check
+
+      - name: Build XNU EFI loader and embed it in the 4 MiB firmware
+        shell: bash
+        working-directory: xnu-builder
+        env:
+          BUILD_JOBS: "4"
+          CLANG_BIN: /usr/bin/
+          PYTHON_COMMAND: python3
+        run: |
+          set -euo pipefail
+          source "$MU_WORK_TREE/.venv/bin/activate"
+          WORKSPACE="$MU_WORK_TREE" scripts/build-boot-firmware.sh
+          LOADER="$MU_WORK_TREE/Build/B2LXnu/RELEASE_CLANGPDB/AARCH64/XnuLoader.efi"
+          test -s "$LOADER"
+          mapfile -t FDS < <(find "$MU_WORK_TREE/Build" -type f -iname '*beyond2lte*.fd' -size 4096k)
+          if [[ "${#FDS[@]}" -ne 1 ]]; then
+            echo "::error::Expected exactly one 4 MiB beyond2lte firmware FD; found ${#FDS[@]}."
+            find "$MU_WORK_TREE/Build" -type f -name '*.fd' -print
+            exit 1
+          fi
+          mkdir -p "$GITHUB_WORKSPACE/out/uefi/mu-package/BootShim" "$GITHUB_WORKSPACE/out/uefi/mu-package/Resources/Scripts" "$GITHUB_WORKSPACE/out/uefi/mu-package/Resources/DTBs"
+          cp "${FDS[0]}" "$GITHUB_WORKSPACE/out/uefi/firmware.fd"
+          cp "$LOADER" "$GITHUB_WORKSPACE/out/uefi/XnuLoader.efi"
+          cp "$MU_WORK_TREE/BootShim/BootShim.S" "$GITHUB_WORKSPACE/out/uefi/mu-package/BootShim/"
+          cp "$MU_WORK_TREE/Resources/Scripts/mkbootimg.py" "$GITHUB_WORKSPACE/out/uefi/mu-package/Resources/Scripts/"
+          cp "$MU_WORK_TREE/Resources/DTBs/beyond2lte.dtb" "$GITHUB_WORKSPACE/out/uefi/mu-package/Resources/DTBs/"
+          ls -lh "$GITHUB_WORKSPACE/out/uefi/"
+
+      - name: Upload UEFI packaging inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: b2l-uefi-inputs
+          path: out/uefi/
+          if-no-files-found: error
+          retention-days: 7
+
+  package:
+    name: Package and verify Android BOOT image
+    needs: [kernel, firmware]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout this fork
+        uses: actions/checkout@v4
+
+      - name: Download build outputs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: b2l-*
+          path: incoming
+          merge-multiple: false
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang llvm python3
+
+      - name: Assemble and verify BOOT image
+        shell: bash
+        run: |
+          set -euo pipefail
+          MU="$RUNNER_TEMP/mu-package"
+          mkdir -p "$MU"
+          cp -a incoming/b2l-uefi-inputs/mu-package/. "$MU/"
+          KERNEL="$RUNNER_TEMP/mach.development.b2l"
+          cp incoming/b2l-xnu-kernel/mach.development.b2l "$KERNEL"
+          python3 scripts/package-boot.py --mu "$MU" --firmware incoming/b2l-uefi-inputs/firmware.fd --kernel "$KERNEL" --loader incoming/b2l-uefi-inputs/XnuLoader.efi --output-dir out/first-boot --max-image-bytes 67108864
+          python3 scripts/package-boot.py --verify out/first-boot/boot.img
+          sha256sum out/first-boot/boot.img | tee out/first-boot/SHA256SUMS.txt
+          cat out/first-boot/manifest.json
+
+      - name: Upload verified build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: beyond2lte-ios-boot-image
+          path: |
+            out/first-boot/boot.img
+            out/first-boot/manifest.json
+            out/first-boot/SHA256SUMS.txt
+            out/first-boot/beyond2lte-xnu-boot.tar
+          if-no-files-found: error
+          retention-days: 14
