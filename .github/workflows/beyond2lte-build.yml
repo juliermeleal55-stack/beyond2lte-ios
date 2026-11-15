@@ -42,7 +42,7 @@ jobs:
           xcodebuild -showsdks | grep -q 'iOS 26.5' || { echo "::error::iPhoneOS SDK 26.5 is missing."; exit 1; }
           xcodebuild -showsdks | grep -q 'macOS 27' || { echo "::error::macOS 27 SDK is missing."; exit 1; }
 
-      - name: Download external Apple KDK and B2L dependencies
+      - name: Download external Apple KDK
         shell: bash
         env:
           KDK_URL: ${{ secrets.B2L_KDK_ARCHIVE_URL }}
