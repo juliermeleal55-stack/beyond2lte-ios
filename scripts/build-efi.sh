@@ -7,6 +7,19 @@ export WORKSPACE
 export EDK_TOOLS_PATH="${EDK_TOOLS_PATH:-$WORKSPACE/Mu_Basecore/BaseTools}"
 export EDK_TOOLS_BIN="${EDK_TOOLS_BIN:-$EDK_TOOLS_PATH/Source/C/bin}"
 export PYTHON_COMMAND="${PYTHON_COMMAND:-python3}"
+
+# EDK II's build frontend requires workspace-local Conf/*.txt files.
+# Mu-Silicium keeps the templates under Mu_Basecore/BaseTools/Conf, while
+# the board DSC/FDF paths are resolved from the Mu-Silicium workspace root.
+mkdir -p "$WORKSPACE/Conf"
+for template in target tools_def build_rule; do
+  source_file="$EDK_TOOLS_PATH/Conf/$template.template"
+  destination="$WORKSPACE/Conf/$template.txt"
+  [[ -s "$source_file" ]] || { echo "Missing EDK II template: $source_file" >&2; exit 1; }
+  if [[ ! -s "$destination" ]]; then
+    cp "$source_file" "$destination"
+  fi
+done
 : "${CLANG_BIN:?Set CLANG_BIN to a directory containing clang, llvm-lib, llvm-rc and lld-link}"
 export CLANG_BIN="${CLANG_BIN%/}/"
 export PACKAGES_PATH="$WORKSPACE/Mu_Basecore${PACKAGES_PATH:+:$PACKAGES_PATH}"
