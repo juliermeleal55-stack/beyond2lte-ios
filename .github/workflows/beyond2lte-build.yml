@@ -26,19 +26,16 @@ jobs:
         shell: bash
         env:
           KDK_URL: ${{ secrets.B2L_KDK_ARCHIVE_URL }}
-          DEPS_URL: ${{ secrets.B2L_DEPS_ARCHIVE_URL }}
         run: |
           set -euo pipefail
           [[ "$(uname -m)" == "arm64" ]] || { echo "::error::The XNU job requires an Apple Silicon runner."; exit 1; }
           missing=()
           [[ -n "$KDK_URL" ]] || missing+=("B2L_KDK_ARCHIVE_URL")
-          [[ -n "$DEPS_URL" ]] || missing+=("B2L_DEPS_ARCHIVE_URL")
           if (( ${#missing[@]} )); then
             printf '::error::Missing required Actions secrets: %s\\n' "${missing[*]}"
             exit 1
           fi
           [[ "$KDK_URL" == https://* ]] || { echo "::error::B2L_KDK_ARCHIVE_URL must be HTTPS."; exit 1; }
-          [[ "$DEPS_URL" == https://* ]] || { echo "::error::B2L_DEPS_ARCHIVE_URL must be HTTPS."; exit 1; }
           xcodebuild -version
           xcodebuild -showsdks
           xcodebuild -version | grep -q 'Xcode 27.1' || { echo "::error::Xcode 27.1 is required by docs/build.md."; exit 1; }
@@ -50,11 +47,9 @@ jobs:
         env:
           KDK_URL: ${{ secrets.B2L_KDK_ARCHIVE_URL }}
           KDK_TOKEN: ${{ secrets.B2L_KDK_ARCHIVE_TOKEN }}
-          DEPS_URL: ${{ secrets.B2L_DEPS_ARCHIVE_URL }}
-          DEPS_TOKEN: ${{ secrets.B2L_DEPS_ARCHIVE_TOKEN }}
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/kdk" "$RUNNER_TEMP/b2l-deps"
+          mkdir -p "$RUNNER_TEMP/kdk"
           download() {
             local url="$1" token="$2" output="$3"
             if [[ -n "$token" ]]; then
@@ -64,20 +59,18 @@ jobs:
             fi
           }
           download "$KDK_URL" "$KDK_TOKEN" "$RUNNER_TEMP/kdk.tar.gz"
-          download "$DEPS_URL" "$DEPS_TOKEN" "$RUNNER_TEMP/b2l-deps.tar.gz"
           tar -xzf "$RUNNER_TEMP/kdk.tar.gz" -C "$RUNNER_TEMP/kdk"
-          tar -xzf "$RUNNER_TEMP/b2l-deps.tar.gz" -C "$RUNNER_TEMP/b2l-deps"
-          test -x "$RUNNER_TEMP/b2l-deps/usr/local/libexec/availability.pl" || { echo "::error::B2L_DEPSROOT is missing executable usr/local/libexec/availability.pl."; exit 1; }
-          test -s "$RUNNER_TEMP/b2l-deps/usr/local/lib/kernel/libfirehose_kernel.a" || { echo "::error::B2L_DEPSROOT is missing usr/local/lib/kernel/libfirehose_kernel.a."; exit 1; }
-          test -d "$RUNNER_TEMP/b2l-deps/usr/local/include/kernel" || { echo "::error::B2L_DEPSROOT is missing exported kernel headers."; exit 1; }
-          test -d "$RUNNER_TEMP/b2l-deps/usr/local/include/firehose" || { echo "::error::B2L_DEPSROOT is missing Firehose headers."; exit 1; }
           echo "KDKROOT=$RUNNER_TEMP/kdk" >> "$GITHUB_ENV"
-          echo "B2L_DEPSROOT=$RUNNER_TEMP/b2l-deps" >> "$GITHUB_ENV"
 
       - name: Fetch and prepare pinned XNU
         run: |
           scripts/fetch-xnu.sh
           scripts/prepare-xnu.sh
+          export KDKROOT="$RUNNER_TEMP/kdk"
+          export B2L_DEPSROOT="$RUNNER_TEMP/b2l-deps"
+          export XNU_PATH="$GITHUB_WORKSPACE/xnu"
+          scripts/prepare-apple-deps.sh
+          echo "B2L_DEPSROOT=$B2L_DEPSROOT" >> "$GITHUB_ENV"
 
       - name: Compile standalone B2L kernel
         env:
