@@ -153,7 +153,7 @@ jobs:
           WORKSPACE="$MU_WORK_TREE" scripts/build-boot-firmware.sh
           LOADER="$MU_WORK_TREE/Build/B2LXnu/RELEASE_CLANGPDB/AARCH64/XnuLoader.efi"
           test -s "$LOADER"
-          mapfile -t FDS < <(find "$MU_WORK_TREE/Build" -type f -iname '*beyond2lte*.fd' -size 4096k)
+          mapfile -t FDS < <(find "$MU_WORK_TREE/Build/beyond2ltePkg" -type f -name '*.fd' -size 4096k)
           if [[ "${#FDS[@]}" -ne 1 ]]; then
             echo "::error::Expected exactly one 4 MiB beyond2lte firmware FD; found ${#FDS[@]}."
             find "$MU_WORK_TREE/Build" -type f -name '*.fd' -print
