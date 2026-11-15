@@ -2,6 +2,9 @@ name: beyond2lte XNU BOOT build
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - github-actions-builder
 
 permissions:
   contents: read
