@@ -30,8 +30,15 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$(uname -m)" == "arm64" ]] || { echo "::error::The XNU job requires an Apple Silicon runner."; exit 1; }
-          [[ -n "$KDK_URL" ]] || { echo "::error::Add secret B2L_KDK_ARCHIVE_URL."; exit 1; }
-          [[ -n "$DEPS_URL" ]] || { echo "::error::Add secret B2L_DEPS_ARCHIVE_URL."; exit 1; }
+          missing=()
+          [[ -n "$KDK_URL" ]] || missing+=("B2L_KDK_ARCHIVE_URL")
+          [[ -n "$DEPS_URL" ]] || missing+=("B2L_DEPS_ARCHIVE_URL")
+          if (( ${#missing[@]} )); then
+            printf '::error::Missing required Actions secrets: %s\\n' "${missing[*]}"
+            exit 1
+          fi
+          [[ "$KDK_URL" == https://* ]] || { echo "::error::B2L_KDK_ARCHIVE_URL must be HTTPS."; exit 1; }
+          [[ "$DEPS_URL" == https://* ]] || { echo "::error::B2L_DEPS_ARCHIVE_URL must be HTTPS."; exit 1; }
           xcodebuild -version
           xcodebuild -showsdks
           xcodebuild -version | grep -q 'Xcode 27.1' || { echo "::error::Xcode 27.1 is required by docs/build.md."; exit 1; }
@@ -60,8 +67,10 @@ jobs:
           download "$DEPS_URL" "$DEPS_TOKEN" "$RUNNER_TEMP/b2l-deps.tar.gz"
           tar -xzf "$RUNNER_TEMP/kdk.tar.gz" -C "$RUNNER_TEMP/kdk"
           tar -xzf "$RUNNER_TEMP/b2l-deps.tar.gz" -C "$RUNNER_TEMP/b2l-deps"
-          test -f "$RUNNER_TEMP/b2l-deps/usr/local/libexec/availability.pl"
-          test -f "$RUNNER_TEMP/b2l-deps/usr/local/lib/kernel/libfirehose_kernel.a"
+          test -x "$RUNNER_TEMP/b2l-deps/usr/local/libexec/availability.pl" || { echo "::error::B2L_DEPSROOT is missing executable usr/local/libexec/availability.pl."; exit 1; }
+          test -s "$RUNNER_TEMP/b2l-deps/usr/local/lib/kernel/libfirehose_kernel.a" || { echo "::error::B2L_DEPSROOT is missing usr/local/lib/kernel/libfirehose_kernel.a."; exit 1; }
+          test -d "$RUNNER_TEMP/b2l-deps/usr/local/include/kernel" || { echo "::error::B2L_DEPSROOT is missing exported kernel headers."; exit 1; }
+          test -d "$RUNNER_TEMP/b2l-deps/usr/local/include/firehose" || { echo "::error::B2L_DEPSROOT is missing Firehose headers."; exit 1; }
           echo "KDKROOT=$RUNNER_TEMP/kdk" >> "$GITHUB_ENV"
           echo "B2L_DEPSROOT=$RUNNER_TEMP/b2l-deps" >> "$GITHUB_ENV"
 
