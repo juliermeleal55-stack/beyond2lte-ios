@@ -54,12 +54,16 @@ kernel_private="$deps_root/System/Library/Frameworks/Kernel.framework/PrivateHea
 kernel_public="$deps_root/System/Library/Frameworks/Kernel.framework/Headers"
 test -d "$kernel_private" || { echo "XNU did not install Kernel.framework/PrivateHeaders" >&2; exit 1; }
 test -d "$kernel_public" || { echo "XNU did not install Kernel.framework/Headers" >&2; exit 1; }
-# XNU's MakeInc kernel search path is /usr/local/include/kernel. Populate it
-# from the same build's actual exported private Kernel.framework headers.
+# Merge the matching KDK_SDK include payload when present, then overlay the
+# exact pinned XNU private headers into the kernel compiler's include root.
+if [[ -d "$KDKROOT/usr/local/include" ]]; then
+  mkdir -p "$deps_root/usr/local/include"
+  ditto "$KDKROOT/usr/local/include" "$deps_root/usr/local/include"
+fi
 mkdir -p "$deps_root/usr/local/include/kernel"
 ditto "$kernel_private" "$deps_root/usr/local/include/kernel"
 test -d "$deps_root/usr/local/include/os" || {
-  echo "XNU did not export usr/local/include/os; refusing to substitute generic headers" >&2; exit 1;
+  echo "Neither XNU nor the matching KDK exported usr/local/include/os; refusing generic headers" >&2; exit 1;
 }
 echo "::endgroup::"
 
