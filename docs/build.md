@@ -8,12 +8,15 @@ kernel headers come from Apple's signed Kernel Debug Kit 26.5 build 25F71.
 Both KDK package payloads (`KDK.pkg` and `KDK_SDK.pkg`) are required.
 SDKs and KDKs are external dependencies and must not be committed.
 
-Additional pinned Apple open source dependencies:
+The GitHub Actions workflow builds the remaining Apple open-source
+dependencies from pinned source revisions; they are not supplied as a second
+archive or Actions secret:
 
 | Component | Commit | Purpose |
 | --- | --- | --- |
-| AvailabilityVersions | `149b1777f3e8c2133042d8e188f72e3adf6a7110` | Availability definitions and generator |
-| libdispatch | `701f4d1a24ae9c6863901bbbb22624b7d1b87321` | ARM64 iPhoneOS `libfirehose_kernel.a` and private headers |
+| AvailabilityVersions | `149b1777f3e8c2133042d8e188f72e3adf6a7110` | Generates the availability script and headers |
+| libdispatch | `701f4d1a24ae9c6863901bbbb22624b7d1b87321` | Builds ARM64 iPhoneOS `libfirehose_kernel.a` |
+| XNU | `ac9718fb1af618d5ce8678d0dc6e8a58f252216f` | Installs the exact public and private kernel headers |
 
 The firehose library must target iPhoneOS, not macOS. Do not link the KDK's
 ARM64e SoC or Tightbeam libraries into the generic ARM64 B2L image.
@@ -26,10 +29,18 @@ files under `xnu-overlay/` without resetting a checkout. Use a separate
 object directory for B2L and iPhoneOS. Export lists from a previous macOS
 configuration are not interchangeable with iPhoneOS export lists.
 
-`B2L_DEPSROOT` names an isolated dependency installation root. It contains
-`usr/local/libexec/availability.pl`, exported XNU/private firehose headers and
-`usr/local/lib/kernel/libfirehose_kernel.a`. The patch adds this root to the
-kernel's include and library search paths.
+`scripts/prepare-apple-deps.sh` creates `B2L_DEPSROOT` in the macOS
+runner. It builds AvailabilityVersions, installs headers from the pinned XNU
+tree, merges matching KDK_SDK include payloads when present, and builds
+`libfirehose_kernel.a` from the pinned libdispatch Xcode project. The script
+checks every required output before the kernel build starts. The signed KDK
+archive (KDK + KDK_SDK payloads) is the only external build input; configure
+`B2L_KDK_ARCHIVE_URL` and, only if needed, `B2L_KDK_ARCHIVE_TOKEN` as Actions
+secrets. There is no `B2L_DEPS_ARCHIVE_URL` requirement.
+
+`B2L_DEPSROOT` contains `usr/local/libexec/availability.pl`, the pinned XNU
+public/private headers and `usr/local/lib/kernel/libfirehose_kernel.a`. The
+patch adds this root to the kernel's include and library search paths.
 
 The initial target is `DEVELOPMENT ARM64 B2L`, with `PLATFORM=iPhoneOS`,
 `PLATFORM_FOR_CONFIG=iPhoneOS`, `SDKVERSION=26.5`, `BTI_BUILD=0` and
