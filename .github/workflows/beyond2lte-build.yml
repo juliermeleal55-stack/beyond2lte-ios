@@ -110,7 +110,7 @@ jobs:
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential git git-lfs python3 python3-venv python3-pip clang llvm lld nasm acpica-tools device-tree-compiler rsync uuid-dev libssl-dev libuuid1 zlib1g-dev liblzma-dev
+          sudo apt-get install -y build-essential git git-lfs python3 python3-venv python3-pip python3-git clang llvm lld nasm gcc-aarch64-linux-gnu mono-devel gettext locales gnupg ca-certificates curl acpica-tools device-tree-compiler rsync uuid-dev libssl-dev libuuid1 zlib1g-dev liblzma-dev
 
       - name: Clone Mu-Silicium and prepare the board overlay
         shell: bash
@@ -150,6 +150,7 @@ jobs:
           BUILD_JOBS: "4"
           CLANG_BIN: /usr/bin/
           PYTHON_COMMAND: python3
+          CLANGPDB_AARCH64_PREFIX: aarch64-linux-gnu-
         run: |
           set -euo pipefail
           source "$MU_WORK_TREE/.venv/bin/activate"
