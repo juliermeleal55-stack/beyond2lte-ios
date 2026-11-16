@@ -1,0 +1,63 @@
+name: Retry XNU when macOS runner allocation is cancelled
+
+on:
+  workflow_run:
+    workflows:
+      - beyond2lte XNU BOOT build
+    branches:
+      - github-actions-builder
+    types:
+      - completed
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  retry-kernel-runner:
+    if: github.event.workflow_run.run_attempt < 5
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Retry only if GitHub cancelled the XNU job before it started
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const { owner, repo } = context.repo;
+
+            // Never retry real compiler/build failures. This is only for a
+            // macOS runner allocation cancellation with no steps executed.
+            const jobsResponse = await github.rest.actions.listJobsForWorkflowRun({
+              owner,
+              repo,
+              run_id: run.id,
+              filter: "latest"
+            });
+            const jobs = jobsResponse.data.jobs;
+            const kernel = jobs.find(job => job.name === "Build pinned XNU kernel (macOS)");
+            const firmware = jobs.find(job => job.name === "Build beyond2lte UEFI firmware (Linux)");
+
+            if (!kernel || kernel.conclusion !== "cancelled") {
+              core.info("XNU job was not cancelled; no retry needed.");
+              return;
+            }
+            if (kernel.steps && kernel.steps.length > 0) {
+              core.info("XNU job started executing steps; this is not a runner-allocation failure.");
+              return;
+            }
+            if (!firmware || firmware.conclusion !== "success") {
+              core.info("UEFI did not complete successfully; not retrying the kernel-only path.");
+              return;
+            }
+            if (run.run_attempt >= 5) {
+              core.warning("Automatic retry limit reached (5 attempts).");
+              return;
+            }
+
+            core.warning(`GitHub did not allocate a macOS runner. Retrying XNU only (attempt ${run.run_attempt + 1}/5).`);
+            await github.rest.actions.reRunJob({
+              owner,
+              repo,
+              job_id: kernel.id
+            });
+            core.info("Requested a retry of the cancelled XNU job.");
