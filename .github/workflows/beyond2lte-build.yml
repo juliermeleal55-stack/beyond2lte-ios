@@ -77,7 +77,8 @@ jobs:
         run: |
           scripts/fetch-xnu.sh
           scripts/prepare-xnu.sh
-          export KDKROOT="$RUNNER_TEMP/kdk"
+          : "${KDKROOT:?KDKROOT must be provided by the KDK installation step}"
+          [[ -d "$KDKROOT" ]] || { echo "::error::Installed KDKROOT does not exist: $KDKROOT"; exit 1; }
           export B2L_DEPSROOT="$RUNNER_TEMP/b2l-deps"
           export XNU_PATH="$GITHUB_WORKSPACE/xnu"
           scripts/prepare-apple-deps.sh
