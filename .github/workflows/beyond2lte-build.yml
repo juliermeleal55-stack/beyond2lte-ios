@@ -155,7 +155,7 @@ jobs:
               exit 1
             }
           done
-          if grep -Eq '(^|[[:space:]])(GpioLib|SpeedyLib)\\|' \
+          if grep -Eq '^[[:space:]]*(GpioLib|SpeedyLib)[|]' \
             "$RUNNER_TEMP/Mu-Silicium/Silicon/Samsung/S5E9820Pkg/S5E9820Pkg.dsc.inc"; then
             echo "::error::Obsolete S5E9820 library mapping detected."
             exit 1
