@@ -137,6 +137,12 @@ jobs:
           git -C "$RUNNER_TEMP/Mu-Silicium" submodule update --init --recursive
           test "$(git -C "$RUNNER_TEMP/Mu-Silicium" rev-parse HEAD)" = "$MU_COMMIT"
           cp -a b2l-uefi/mu-silicium-overlay/. "$RUNNER_TEMP/Mu-Silicium/"
+          # Remove the unused memory-map counter that fails this pinned Clang -Werror build.
+          git -C "$RUNNER_TEMP/Mu-Silicium" apply "$GITHUB_WORKSPACE/xnu-builder/patches/uefi/0001-b2lgoster-remove-unused-parca.patch"
+          grep -n -E "Parca" "$RUNNER_TEMP/Mu-Silicium/Platforms/Samsung/beyond2ltePkg/Applications/B2LGoster/B2LGoster.c" && {
+            echo "::error::B2LGoster unused Parca variable patch did not apply cleanly."
+            exit 1
+          } || true
           # Replace the board's stale pre-GpioBankLib S5E9820 DSC fragment with
           # the audited mapping for this pinned Mu-Silicium revision.
           install -D "$GITHUB_WORKSPACE/xnu-builder/patches/uefi/S5E9820Pkg.dsc.inc" \
