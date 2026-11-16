@@ -58,7 +58,8 @@ jobs:
           echo "$KDK_SHA256  $RUNNER_TEMP/kdk-26.5-25F71.dmg" | shasum -a 256 -c -
           mkdir -p "$RUNNER_TEMP/kdk-mount"
           hdiutil attach "$RUNNER_TEMP/kdk-26.5-25F71.dmg" -readonly -nobrowse -mountpoint "$RUNNER_TEMP/kdk-mount"
-          mapfile -t KDK_PACKAGES < <(find "$RUNNER_TEMP/kdk-mount" -type f -name '*.pkg' -print | sort)
+          KDK_PACKAGES=()
+          while IFS= read -r package; do KDK_PACKAGES+=("$package"); done < <(find "$RUNNER_TEMP/kdk-mount" -maxdepth 3 -name '*.pkg' -print | sort)
           if [[ "${#KDK_PACKAGES[@]}" -eq 0 ]]; then
             hdiutil detach "$RUNNER_TEMP/kdk-mount" || true
             echo "::error::The KDK disk image contains no installer packages."
