@@ -14,7 +14,11 @@ libdispatch_src="${LIBDISPATCH_SOURCE:-$repo_root/out/dependencies/libdispatch}"
 build_root="${B2L_BUILD_ROOT:-$repo_root/out/apple-deps/firehose}"
 mkdir -p "$build_root/obj" "$build_root/sym" "$B2L_DEPSROOT/usr/local/lib/kernel"
 
-header_paths="$libdispatch_src $libdispatch_src/src $libdispatch_src/src/firehose $B2L_DEPSROOT/usr/local/include/kernel $B2L_DEPSROOT/usr/local/include/os $B2L_DEPSROOT/usr/local/include/firehose $B2L_DEPSROOT/System/Library/Frameworks/Kernel.framework/PrivateHeaders $B2L_DEPSROOT/System/Library/Frameworks/Kernel.framework/Headers $KDKROOT/System/Library/Frameworks/Kernel.framework/Versions/A/PrivateHeaders $KDKROOT/System/Library/Frameworks/Kernel.framework/Versions/A/Headers $KDKROOT/usr/local/include/os $KDKROOT/usr/local/include/firehose"
+iphoneos_sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
+[[ -f "$iphoneos_sdk/usr/include/TargetConditionals.h" ]] || {
+  echo "TargetConditionals.h is missing from the selected iPhoneOS SDK: $iphoneos_sdk" >&2; exit 1;
+}
+header_paths="$iphoneos_sdk/usr/include $libdispatch_src $libdispatch_src/src $libdispatch_src/src/firehose $B2L_DEPSROOT/usr/local/include/kernel $B2L_DEPSROOT/usr/local/include/os $B2L_DEPSROOT/usr/local/include/firehose $B2L_DEPSROOT/System/Library/Frameworks/Kernel.framework/PrivateHeaders $B2L_DEPSROOT/System/Library/Frameworks/Kernel.framework/Headers $KDKROOT/System/Library/Frameworks/Kernel.framework/Versions/A/PrivateHeaders $KDKROOT/System/Library/Frameworks/Kernel.framework/Versions/A/Headers $KDKROOT/usr/local/include/os $KDKROOT/usr/local/include/firehose"
 
 xcodebuild install \
   -project "$libdispatch_src/libdispatch.xcodeproj" \
