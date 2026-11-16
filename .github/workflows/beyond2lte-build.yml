@@ -73,6 +73,9 @@ jobs:
           [[ -d "$KDKROOT" ]] || { echo "::error::The KDK installer did not create $KDKROOT"; find /Library/Developer/KDKs -maxdepth 2 -print 2>/dev/null || true; exit 1; }
           echo "KDKROOT=$KDKROOT" >> "$GITHUB_ENV"
 
+      - name: Prepare iOS 26.5 launchd source from iPhone 17 IPSW
+        run: scripts/prepare-ios-launch-cache.sh
+
       - name: Fetch and prepare pinned XNU
         run: |
           scripts/fetch-xnu.sh
