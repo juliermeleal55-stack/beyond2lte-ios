@@ -29,9 +29,9 @@ jobs:
           [[ "$(uname -m)" == "arm64" ]] || { echo "::error::The XNU job requires an Apple Silicon runner."; exit 1; }
           xcodebuild -version
           xcodebuild -showsdks
-          xcodebuild -version | grep -q 'Xcode 27.1' || { echo "::error::Xcode 27.1 is required by docs/build.md."; exit 1; }
+          xcodebuild -version | grep -q 'Xcode 26.6' || { echo "::error::Xcode 26.6 is required for the pinned iOS 26.5 SDK and KDK 26.5."; exit 1; }
           xcodebuild -showsdks | grep -q 'iOS 26.5' || { echo "::error::iPhoneOS SDK 26.5 is missing."; exit 1; }
-          xcodebuild -showsdks | grep -q 'macOS 27' || { echo "::error::macOS 27 SDK is missing."; exit 1; }
+          xcodebuild -showsdks | grep -q 'macOS 26.5' || { echo "::error::macOS 26.5 SDK is missing."; exit 1; }
 
       - name: Download and install matching KDK from public archive manifest
         shell: bash
