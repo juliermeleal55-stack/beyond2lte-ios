@@ -68,7 +68,7 @@ test -d "$deps_root/usr/local/include/os" || {
 echo "::endgroup::"
 
 echo "::group::Build the pinned iPhoneOS ARM64 Firehose archive"
-LIBDISPATCH_SOURCE="$libdispatch_src" scripts/build-firehose.sh
+LIBDISPATCH_SOURCE="$libdispatch_src" bash scripts/build-firehose.sh
 firehose="$deps_root/usr/local/lib/kernel/libfirehose_kernel.a"
 test -s "$firehose" || { echo "libfirehose_kernel.a was not installed at the required path" >&2; exit 1; }
 echo "::endgroup::"
