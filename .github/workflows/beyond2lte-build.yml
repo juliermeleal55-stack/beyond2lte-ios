@@ -94,7 +94,7 @@ jobs:
           [[ -d "$KDKROOT" ]] || { echo "::error::Installed KDKROOT does not exist: $KDKROOT"; exit 1; }
           export B2L_DEPSROOT="$RUNNER_TEMP/b2l-deps"
           export XNU_PATH="$GITHUB_WORKSPACE/xnu"
-          scripts/prepare-apple-deps.sh
+          bash scripts/prepare-apple-deps.sh
           echo "B2L_DEPSROOT=$B2L_DEPSROOT" >> "$GITHUB_ENV"
 
       - name: Compile standalone B2L kernel
