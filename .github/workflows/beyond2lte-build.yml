@@ -139,7 +139,7 @@ jobs:
           cp -a b2l-uefi/mu-silicium-overlay/. "$RUNNER_TEMP/Mu-Silicium/"
           # Replace the board's stale pre-GpioBankLib S5E9820 DSC fragment with
           # the audited mapping for this pinned Mu-Silicium revision.
-          install -D "$GITHUB_WORKSPACE/patches/uefi/S5E9820Pkg.dsc.inc" \
+          install -D "$GITHUB_WORKSPACE/xnu-builder/patches/uefi/S5E9820Pkg.dsc.inc" \
             "$RUNNER_TEMP/Mu-Silicium/Silicon/Samsung/S5E9820Pkg/S5E9820Pkg.dsc.inc"
           # Fail early if any real Exynos 9820 implementation is missing.
           for source in \
