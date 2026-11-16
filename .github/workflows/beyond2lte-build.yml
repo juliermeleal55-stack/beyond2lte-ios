@@ -22,45 +22,55 @@ jobs:
       - name: Checkout this fork
         uses: actions/checkout@v4
 
-      - name: Check Apple toolchain and required private inputs
+      - name: Check Apple toolchain
         shell: bash
-        env:
-          KDK_URL: ${{ secrets.B2L_KDK_ARCHIVE_URL }}
         run: |
           set -euo pipefail
           [[ "$(uname -m)" == "arm64" ]] || { echo "::error::The XNU job requires an Apple Silicon runner."; exit 1; }
-          missing=()
-          [[ -n "$KDK_URL" ]] || missing+=("B2L_KDK_ARCHIVE_URL")
-          if (( ${#missing[@]} )); then
-            printf '::error::Missing required Actions secrets: %s\\n' "${missing[*]}"
-            exit 1
-          fi
-          [[ "$KDK_URL" == https://* ]] || { echo "::error::B2L_KDK_ARCHIVE_URL must be HTTPS."; exit 1; }
           xcodebuild -version
           xcodebuild -showsdks
           xcodebuild -version | grep -q 'Xcode 27.1' || { echo "::error::Xcode 27.1 is required by docs/build.md."; exit 1; }
           xcodebuild -showsdks | grep -q 'iOS 26.5' || { echo "::error::iPhoneOS SDK 26.5 is missing."; exit 1; }
           xcodebuild -showsdks | grep -q 'macOS 27' || { echo "::error::macOS 27 SDK is missing."; exit 1; }
 
-      - name: Download external Apple KDK
+      - name: Download and install matching KDK from public archive manifest
         shell: bash
-        env:
-          KDK_URL: ${{ secrets.B2L_KDK_ARCHIVE_URL }}
-          KDK_TOKEN: ${{ secrets.B2L_KDK_ARCHIVE_TOKEN }}
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/kdk"
-          download() {
-            local url="$1" token="$2" output="$3"
-            if [[ -n "$token" ]]; then
-              curl --fail --location --retry 3 -H "Authorization: Bearer $token" "$url" -o "$output"
-            else
-              curl --fail --location --retry 3 "$url" -o "$output"
-            fi
-          }
-          download "$KDK_URL" "$KDK_TOKEN" "$RUNNER_TEMP/kdk.tar.gz"
-          tar -xzf "$RUNNER_TEMP/kdk.tar.gz" -C "$RUNNER_TEMP/kdk"
-          echo "KDKROOT=$RUNNER_TEMP/kdk" >> "$GITHUB_ENV"
+          python3 - <<'PY' > "$RUNNER_TEMP/kdk-source.env"
+          import json
+          import urllib.request
+
+          manifest_url = "https://raw.githubusercontent.com/dortania/KdkSupportPkg/gh-pages/manifest.json"
+          with urllib.request.urlopen(manifest_url, timeout=60) as response:
+              entries = json.load(response)
+          matches = [item for item in entries if item.get("build") == "25F71" and item.get("version") == "26.5"]
+          if len(matches) != 1:
+              raise SystemExit(f"Expected one KDK 26.5 build 25F71 entry, found {len(matches)}")
+          item = matches[0]
+          if not item.get("url", "").startswith("https://github.com/dortania/KdkSupportPkg/releases/"):
+              raise SystemExit("KDK archive URL is not from the expected public mirror")
+          print(f"KDK_URL={item['url']}")
+          print(f"KDK_SHA256={item['sha256sum']}")
+          PY
+          source "$RUNNER_TEMP/kdk-source.env"
+          curl --fail --location --retry 3 "$KDK_URL" -o "$RUNNER_TEMP/kdk-26.5-25F71.dmg"
+          echo "$KDK_SHA256  $RUNNER_TEMP/kdk-26.5-25F71.dmg" | shasum -a 256 -c -
+          mkdir -p "$RUNNER_TEMP/kdk-mount"
+          hdiutil attach "$RUNNER_TEMP/kdk-26.5-25F71.dmg" -readonly -nobrowse -mountpoint "$RUNNER_TEMP/kdk-mount"
+          mapfile -t KDK_PACKAGES < <(find "$RUNNER_TEMP/kdk-mount" -type f -name '*.pkg' -print | sort)
+          if [[ "${#KDK_PACKAGES[@]}" -eq 0 ]]; then
+            hdiutil detach "$RUNNER_TEMP/kdk-mount" || true
+            echo "::error::The KDK disk image contains no installer packages."
+            exit 1
+          fi
+          for package in "${KDK_PACKAGES[@]}"; do
+            sudo installer -pkg "$package" -target /
+          done
+          hdiutil detach "$RUNNER_TEMP/kdk-mount"
+          KDKROOT="/Library/Developer/KDKs/KDK_26.5_25F71.kdk"
+          [[ -d "$KDKROOT" ]] || { echo "::error::The KDK installer did not create $KDKROOT"; find /Library/Developer/KDKs -maxdepth 2 -print 2>/dev/null || true; exit 1; }
+          echo "KDKROOT=$KDKROOT" >> "$GITHUB_ENV"
 
       - name: Fetch and prepare pinned XNU
         run: |
