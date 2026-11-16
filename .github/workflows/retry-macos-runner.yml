@@ -44,7 +44,6 @@ jobs:
             });
             const jobs = response.data.jobs;
             const kernel = jobs.find(job => job.name === "Build pinned XNU kernel (macOS)");
-            const firmware = jobs.find(job => job.name === "Build beyond2lte UEFI firmware (Linux)");
 
             if (!kernel || kernel.conclusion !== "cancelled") {
               core.info("XNU was not cancelled; no retry needed.");
@@ -54,11 +53,6 @@ jobs:
               core.info("At least one XNU step started; this is not a runner-allocation cancellation.");
               return;
             }
-            if (!firmware || firmware.conclusion !== "success") {
-              core.info("UEFI did not succeed; refusing a kernel-only retry.");
-              return;
-            }
-
             core.warning(`macOS runner allocation cancelled before XNU steps. Requesting XNU-only retry (attempt ${attempt + 1}/5).`);
             await github.request(
               "POST /repos/{owner}/{repo}/actions/jobs/{job_id}/rerun",
