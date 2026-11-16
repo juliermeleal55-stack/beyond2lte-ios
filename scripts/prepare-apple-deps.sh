@@ -36,10 +36,8 @@ make -C "$availability_src" install \
   OBJROOT="$deps_build/availability-obj" \
   SYMROOT="$deps_build/availability-sym" \
   DSTROOT="$deps_root"
-availability="$deps_root/usr/local/libexec/availability"
-test -x "$availability" || { echo "AvailabilityVersions did not install usr/local/libexec/availability" >&2; exit 1; }
-install -m 0755 "$availability" "$deps_root/usr/local/libexec/availability.pl"
-test -x "$deps_root/usr/local/libexec/availability.pl"
+availability="$deps_root/usr/local/libexec/availability.pl"
+test -x "$availability" || { echo "AvailabilityVersions did not install usr/local/libexec/availability.pl" >&2; exit 1; }
 echo "::endgroup::"
 
 echo "::group::Install headers from the pinned, prepared XNU tree"
