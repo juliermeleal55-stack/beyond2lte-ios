@@ -118,7 +118,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: orhunnx/beyond2lte-uefi
-          ref: master
+          ref: f122c7024c5eeef2c8c78dfd08c62708c9ef823d
           path: b2l-uefi
 
       - name: Install Linux build dependencies
