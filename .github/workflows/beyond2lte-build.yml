@@ -74,7 +74,7 @@ jobs:
           echo "KDKROOT=$KDKROOT" >> "$GITHUB_ENV"
 
       - name: Prepare iOS 26.5 launchd source from iPhone 17 IPSW
-        run: scripts/prepare-ios-launch-cache.sh
+        run: bash scripts/prepare-ios-launch-cache.sh
 
       - name: Fetch and prepare pinned XNU
         run: |
