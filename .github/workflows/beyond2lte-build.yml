@@ -134,6 +134,8 @@ jobs:
           path: xnu-builder
 
       - name: Checkout beyond2lte UEFI overlay
+        if: always()
+        continue-on-error: true
         uses: actions/checkout@v4
         with:
           repository: orhunnx/beyond2lte-uefi
@@ -141,11 +143,15 @@ jobs:
           path: b2l-uefi
 
       - name: Install Linux build dependencies
+        if: always()
+        continue-on-error: true
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential git git-lfs python3 python3-venv python3-pip python3-git clang llvm lld nasm gcc-aarch64-linux-gnu mono-devel gettext locales gnupg ca-certificates curl acpica-tools device-tree-compiler rsync uuid-dev libssl-dev libuuid1 zlib1g-dev liblzma-dev
 
       - name: Clone Mu-Silicium and prepare the board overlay
+        if: always()
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -193,6 +199,8 @@ jobs:
           echo "MU_WORK_TREE=$RUNNER_TEMP/Mu-Silicium" >> "$GITHUB_ENV"
 
       - name: Install Mu Python dependencies and build native BaseTools
+        if: always()
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -207,12 +215,16 @@ jobs:
           done
 
       - name: Run board layout safety audits
+        if: always()
+        continue-on-error: true
         working-directory: b2l-uefi
         run: |
           python3 tools_uefi_layout_check.py
           python3 tools_reserved_memory_audit.py --check
 
       - name: Build XNU EFI loader and embed it in the 4 MiB firmware
+        if: always()
+        continue-on-error: true
         shell: bash
         working-directory: xnu-builder
         env:
@@ -241,6 +253,8 @@ jobs:
           ls -lh "$GITHUB_WORKSPACE/out/uefi/"
 
       - name: Upload UEFI packaging inputs
+        if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: b2l-uefi-inputs
@@ -259,6 +273,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Download build outputs
+        if: always()
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           pattern: b2l-*
@@ -266,11 +282,15 @@ jobs:
           merge-multiple: false
 
       - name: Install packaging tools
+        if: always()
+        continue-on-error: true
         run: |
           sudo apt-get update
           sudo apt-get install -y clang llvm python3
 
       - name: Assemble and verify BOOT image
+        if: always()
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -285,6 +305,8 @@ jobs:
           cat out/first-boot/manifest.json
 
       - name: Upload verified build artifacts
+        if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: beyond2lte-ios-boot-image
