@@ -130,9 +130,36 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git clone --recursive https://github.com/Project-Silicium/Mu-Silicium.git "$RUNNER_TEMP/Mu-Silicium"
+          MU_COMMIT="fb4efb37b4ac289ce83ad94c7acb73defb87955c"
+          git clone https://github.com/Project-Silicium/Mu-Silicium.git "$RUNNER_TEMP/Mu-Silicium"
+          git -C "$RUNNER_TEMP/Mu-Silicium" checkout --detach "$MU_COMMIT"
+          git -C "$RUNNER_TEMP/Mu-Silicium" submodule sync --recursive
           git -C "$RUNNER_TEMP/Mu-Silicium" submodule update --init --recursive
+          test "$(git -C "$RUNNER_TEMP/Mu-Silicium" rev-parse HEAD)" = "$MU_COMMIT"
           cp -a b2l-uefi/mu-silicium-overlay/. "$RUNNER_TEMP/Mu-Silicium/"
+          # Replace the board's stale pre-GpioBankLib S5E9820 DSC fragment with
+          # the audited mapping for this pinned Mu-Silicium revision.
+          install -D "$GITHUB_WORKSPACE/patches/uefi/S5E9820Pkg.dsc.inc" \
+            "$RUNNER_TEMP/Mu-Silicium/Silicon/Samsung/S5E9820Pkg/S5E9820Pkg.dsc.inc"
+          # Fail early if any real Exynos 9820 implementation is missing.
+          for source in \
+            Silicon/Samsung/S5E9820Pkg/Library/GpioBankLib/GpioBankLib.inf \
+            Silicon/Samsung/S5E9820Pkg/Library/PlatformSecLib/PlatformSecLib.inf \
+            Silicon/Samsung/S5E9820Pkg/Library/ResetSystemLib/ResetSystemLib.inf \
+            Silicon/Samsung/S5E9820Pkg/Library/PmicLib/PmicLib.inf \
+            Silicon/Samsung/S5E9820Pkg/Library/UsiLib/UsiLib.inf \
+            Silicon/Samsung/S5E9820Pkg/Library/HsI2cLib/HsI2cLib.inf \
+            Silicon/Samsung/S5E9820Pkg/Library/PlatformUfsLib/PlatformUfsLib.inf; do
+            test -s "$RUNNER_TEMP/Mu-Silicium/$source" || {
+              echo "::error::Missing required S5E9820 source: $source"
+              exit 1
+            }
+          done
+          if grep -Eq '(^|[[:space:]])(GpioLib|SpeedyLib)\\|' \
+            "$RUNNER_TEMP/Mu-Silicium/Silicon/Samsung/S5E9820Pkg/S5E9820Pkg.dsc.inc"; then
+            echo "::error::Obsolete S5E9820 library mapping detected."
+            exit 1
+          fi
           # The Samsung ACPI package is a separate overlay in the board repo.
           # build-boot-firmware.sh expects it at Mu-Silicium/Silicium-ACPI.
           test -d b2l-uefi/silicium-acpi-overlay/SoCs/Samsung
