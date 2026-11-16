@@ -31,11 +31,17 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$(uname -m)" == "arm64" ]] || { echo "::error::The XNU job requires an Apple Silicon runner."; exit 1; }
+          XCODE_APP="/Applications/Xcode_26.6.app"
+          [[ -d "$XCODE_APP" ]] || { echo "::error::Pinned Xcode image is missing: $XCODE_APP"; ls -la /Applications | head -n 80; exit 1; }
+          sudo xcode-select --switch "$XCODE_APP/Contents/Developer"
           xcodebuild -version
           xcodebuild -showsdks
-          xcodebuild -version | grep -q 'Xcode 26.6' || { echo "::error::Xcode 26.6 is required for the pinned iOS 26.5 SDK and KDK 26.5."; exit 1; }
-          xcodebuild -showsdks | grep -q 'iOS 26.5' || { echo "::error::iPhoneOS SDK 26.5 is missing."; exit 1; }
-          xcodebuild -showsdks | grep -q 'macOS 26.5' || { echo "::error::macOS 26.5 SDK is missing."; exit 1; }
+          [[ "$(xcodebuild -version | awk '/^Xcode / {print $2}')" == "26.6" ]] || { echo "::error::Xcode 26.6 is required."; exit 1; }
+          IOS_SDK="$(xcrun --sdk iphoneos --show-sdk-version)"
+          MACOS_SDK="$(xcrun --sdk macosx --show-sdk-version)"
+          [[ "$IOS_SDK" == "26.5" ]] || { echo "::error::Expected iPhoneOS SDK 26.5, found $IOS_SDK"; exit 1; }
+          [[ "$MACOS_SDK" == "26.5" ]] || { echo "::error::Expected macOS SDK 26.5, found $MACOS_SDK"; exit 1; }
+          echo "Validated Apple Silicon + Xcode 26.6 + iOS/macOS SDK 26.5."
 
       - name: Download and install matching KDK from public archive manifest
         shell: bash
@@ -113,6 +119,7 @@ jobs:
 
   firmware:
     name: Build beyond2lte UEFI firmware (Linux)
+    needs: kernel
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
