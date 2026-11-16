@@ -5,13 +5,17 @@ on:
   push:
     branches:
       - github-actions-builder
+    paths:
+      - '.github/workflows/beyond2lte-build.yml'
+      - 'scripts/**'
+      - 'patches/**'
 
 permissions:
   contents: read
 
 concurrency:
   group: beyond2lte-ios-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   kernel:
