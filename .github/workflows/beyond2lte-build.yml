@@ -133,6 +133,12 @@ jobs:
           git clone --recursive https://github.com/Project-Silicium/Mu-Silicium.git "$RUNNER_TEMP/Mu-Silicium"
           git -C "$RUNNER_TEMP/Mu-Silicium" submodule update --init --recursive
           cp -a b2l-uefi/mu-silicium-overlay/. "$RUNNER_TEMP/Mu-Silicium/"
+          # The Samsung ACPI package is a separate overlay in the board repo.
+          # build-boot-firmware.sh expects it at Mu-Silicium/Silicium-ACPI.
+          test -d b2l-uefi/silicium-acpi-overlay/SoCs/Samsung
+          mkdir -p "$RUNNER_TEMP/Mu-Silicium/Silicium-ACPI"
+          cp -a b2l-uefi/silicium-acpi-overlay/. "$RUNNER_TEMP/Mu-Silicium/Silicium-ACPI/"
+          test -d "$RUNNER_TEMP/Mu-Silicium/Silicium-ACPI/SoCs/Samsung"
           test -s "$RUNNER_TEMP/Mu-Silicium/Resources/DTBs/beyond2lte.dtb"
           test -s "$RUNNER_TEMP/Mu-Silicium/BootShim/BootShim.S"
           echo "MU_WORK_TREE=$RUNNER_TEMP/Mu-Silicium" >> "$GITHUB_ENV"
