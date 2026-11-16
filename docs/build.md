@@ -5,7 +5,9 @@
 The initial local build uses an Apple Silicon Mac, Xcode 27.1, the macOS 27
 SDK for host tools, and an iPhoneOS target of 26.5 for the kernel. The private
 kernel headers come from Apple's signed Kernel Debug Kit 26.5 build 25F71.
-Both KDK package payloads (`KDK.pkg` and `KDK_SDK.pkg`) are required.
+The workflow retrieves that exact build from the public Dortania KdkSupportPkg
+community mirror, verifies its published SHA-256, and installs it on the
+temporary macOS runner. This is not Apple's official download service.
 SDKs and KDKs are external dependencies and must not be committed.
 
 The GitHub Actions workflow builds the remaining Apple open-source
@@ -33,10 +35,10 @@ configuration are not interchangeable with iPhoneOS export lists.
 runner. It builds AvailabilityVersions, installs headers from the pinned XNU
 tree, merges matching KDK_SDK include payloads when present, and builds
 `libfirehose_kernel.a` from the pinned libdispatch Xcode project. The script
-checks every required output before the kernel build starts. The signed KDK
-archive (KDK + KDK_SDK payloads) is the only external build input; configure
-`B2L_KDK_ARCHIVE_URL` and, only if needed, `B2L_KDK_ARCHIVE_TOKEN` as Actions
-secrets. There is no `B2L_DEPS_ARCHIVE_URL` requirement.
+checks every required output before the kernel build starts. The KDK is fetched
+automatically from the community mirror's manifest and checked against the
+published SHA-256; no Actions secret or manual URL is required. There is no
+`B2L_DEPS_ARCHIVE_URL` requirement.
 
 `B2L_DEPSROOT` contains `usr/local/libexec/availability.pl`, the pinned XNU
 public/private headers and `usr/local/lib/kernel/libfirehose_kernel.a`. The
