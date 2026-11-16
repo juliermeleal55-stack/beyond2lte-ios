@@ -1,0 +1,21 @@
+diff --git a/Platforms/Samsung/beyond2ltePkg/Applications/B2LGoster/B2LGoster.c b/Platforms/Samsung/beyond2ltePkg/Applications/B2LGoster/B2LGoster.c
+index 0000000..0000000 100644
+--- a/Platforms/Samsung/beyond2ltePkg/Applications/B2LGoster/B2LGoster.c
++++ b/Platforms/Samsung/beyond2ltePkg/Applications/B2LGoster/B2LGoster.c
+@@ -393,7 +393,6 @@
+     UINT64                 Sayfa;
+     UINT64                 Tepe;
+-    UINT32                 Parca;
+ 
+     Harita = NULL;
+     Boyut  = 0;
+     Sayfa  = 0;
+     Tepe   = 0;
+-    Parca  = 0;
+ 
+@@ -408,7 +407,6 @@
+ 
+           Sayfa += D->NumberOfPages;
+-          Parca++;
+ 
+           Son = D->PhysicalStart + D->NumberOfPages * 4096;
