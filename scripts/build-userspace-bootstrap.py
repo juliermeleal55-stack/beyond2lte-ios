@@ -3,9 +3,9 @@
 """Build our bounded native iOS migration launcher and its kernel seed header."""
 from pathlib import Path
 from b2l_launch_cache import pad_binary_plist
-import argparse,hashlib,json,plistlib,subprocess,tempfile,importlib.util,struct
+import argparse,hashlib,json,plistlib,subprocess,tempfile,struct
 r=Path(__file__).resolve().parents[1]
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('--output',type=Path,required=True);p.add_argument('--launchd-plist',type=Path,default=r/'out/ipsw/launchd.plist');a=p.parse_args()
 sdk=subprocess.check_output(['xcrun','--sdk','iphoneos','--show-sdk-path'],text=True).strip()
 with tempfile.TemporaryDirectory(prefix='b2l-app-bootstrap-') as td:
  binary=Path(td)/'b2l-system-app-bootstrap-v2'
@@ -18,17 +18,14 @@ with tempfile.TemporaryDirectory(prefix='b2l-app-bootstrap-') as td:
   raise SystemExit('Bootstrap must carry the arm64e pointer-auth ABI subtype')
  if len(data)>512*1024:raise SystemExit('Bootstrap exceeds bounded payload size')
  job=plistlib.dumps({'Label':'dev.b2l.system-app-bootstrap-v2','ProgramArguments':['/usr/local/libexec/b2l-system-app-bootstrap-v2'],'RunAtLoad':True,'UserName':'root','ProcessType':'Background','LowPriorityIO':True,'StandardOutPath':'/private/var/log/b2l-system-app-bootstrap-v2.log','StandardErrorPath':'/private/var/log/b2l-system-app-bootstrap-v2.log'},fmt=plistlib.FMT_XML)
- # Read the exact source launch cache from the local prepared IPSW image.
- # Only the private generated header contains Apple cache data.
- spec=importlib.util.spec_from_file_location('hfsreader',r/'scripts/pull-b2l-unified-logs.py')
- m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
- reader=m.ImageReader(r/'out/ipsw/ios26-userdata.hfs.img');volume=m.Volume(reader)
- cache_path='/System/Library/xpc/launchd.plist';source=None
- for entry,full,_,_ in volume.selected((cache_path,)):
-  if full==cache_path:source=b''.join(m.Fork(volume,entry['fork_raw'],entry['id']).resolve(volume.overflow).content());break
- if source is None or not volume.unchanged():raise SystemExit('Missing/changed original launch cache')
- reader.close()
- original=plistlib.loads(source);derived=plistlib.loads(source)
+ # Consume the exact launchd.plist extracted from the selected iPhone 17 IPSW.
+ # The build stores only this bounded source plist in the private generated header.
+ source=a.launchd_plist.read_bytes()
+ if not source or len(source)>16*1024*1024:raise SystemExit('Missing or oversized original launchd.plist')
+ original=plistlib.loads(source)
+ if not isinstance(original,dict) or not isinstance(original.get('LaunchDaemons'),dict):
+  raise SystemExit('Source launchd.plist has no LaunchDaemons dictionary')
+ derived=plistlib.loads(source)
  job_path='/System/Library/LaunchDaemons/dev.b2l.system-app-bootstrap-v2.plist'
  if job_path in derived['LaunchDaemons']:raise SystemExit('Owned job already in source launch cache')
  derived['LaunchDaemons'][job_path]=plistlib.loads(job)
