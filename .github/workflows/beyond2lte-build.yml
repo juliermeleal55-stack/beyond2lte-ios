@@ -94,10 +94,12 @@ jobs:
           [[ -d "$KDKROOT" ]] || { echo "::error::Installed KDKROOT does not exist: $KDKROOT"; exit 1; }
           export B2L_DEPSROOT="$RUNNER_TEMP/b2l-deps"
           export XNU_PATH="$GITHUB_WORKSPACE/xnu"
-          bash scripts/prepare-apple-deps.sh
           echo "B2L_DEPSROOT=$B2L_DEPSROOT" >> "$GITHUB_ENV"
+          bash scripts/prepare-apple-deps.sh
 
       - name: Compile standalone B2L kernel
+        if: always()
+        continue-on-error: true
         env:
           BUILD_JOBS: "4"
         run: |
@@ -110,6 +112,8 @@ jobs:
           test -s out/kernel/mach.development.b2l
 
       - name: Upload XNU kernel
+        if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: b2l-xnu-kernel
@@ -119,6 +123,7 @@ jobs:
 
   firmware:
     name: Build beyond2lte UEFI firmware (Linux)
+    if: always()
     needs: kernel
     runs-on: ubuntu-24.04
     timeout-minutes: 180
@@ -245,6 +250,7 @@ jobs:
 
   package:
     name: Package and verify Android BOOT image
+    if: always()
     needs: [kernel, firmware]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
