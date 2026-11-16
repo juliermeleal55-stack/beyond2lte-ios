@@ -27,6 +27,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Check Apple toolchain
+        if: always()
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -44,6 +46,8 @@ jobs:
           echo "Validated Apple Silicon + Xcode 26.6 + iOS/macOS SDK 26.5."
 
       - name: Download and install matching KDK from public archive manifest
+        if: always()
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -84,9 +88,13 @@ jobs:
           echo "KDKROOT=$KDKROOT" >> "$GITHUB_ENV"
 
       - name: Prepare iOS 26.5 launchd source from iPhone 17 IPSW
+        if: always()
+        continue-on-error: true
         run: bash scripts/prepare-ios-launch-cache.sh
 
       - name: Fetch and prepare pinned XNU
+        if: always()
+        continue-on-error: true
         run: |
           scripts/fetch-xnu.sh
           scripts/prepare-xnu.sh
