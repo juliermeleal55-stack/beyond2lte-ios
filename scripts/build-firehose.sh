@@ -32,8 +32,7 @@ xcodebuild install \
   SYMROOT="$build_root/sym" \
   DSTROOT="$B2L_DEPSROOT" \
   CODE_SIGNING_ALLOWED=NO \
-  OTHER_CFLAGS='$(inherited) -mcpu=generic -march=armv8-a+crypto' \
-  OTHER_CFLAGS="$(inherited) -mcpu=generic -march=armv8-a+crypto -include $xnu_mach_port" \
+  OTHER_CFLAGS='$(inherited) -mcpu=generic -march=armv8-a+crypto -include '"$xnu_mach_port" \
   HEADER_SEARCH_PATHS="$header_paths"
 
 archive="$B2L_DEPSROOT/usr/local/lib/kernel/libfirehose_kernel.a"
