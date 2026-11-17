@@ -18,6 +18,8 @@ iphoneos_sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
 [[ -f "$iphoneos_sdk/usr/include/TargetConditionals.h" ]] || {
   echo "TargetConditionals.h is missing from the selected iPhoneOS SDK: $iphoneos_sdk" >&2; exit 1;
 }
+xnu_mach_port="$B2L_DEPSROOT/usr/local/include/kernel/mach/port.h"
+[[ -s "$xnu_mach_port" ]] || { echo "Matching XNU mach/port.h is missing: $xnu_mach_port" >&2; exit 1; }
 header_paths="$iphoneos_sdk/usr/include $libdispatch_src $libdispatch_src/src $libdispatch_src/src/firehose $B2L_DEPSROOT/usr/local/include/kernel $B2L_DEPSROOT/usr/local/include/os $B2L_DEPSROOT/usr/local/include/firehose $B2L_DEPSROOT/System/Library/Frameworks/Kernel.framework/PrivateHeaders $B2L_DEPSROOT/System/Library/Frameworks/Kernel.framework/Headers $KDKROOT/System/Library/Frameworks/Kernel.framework/Versions/A/PrivateHeaders $KDKROOT/System/Library/Frameworks/Kernel.framework/Versions/A/Headers $KDKROOT/usr/local/include/os $KDKROOT/usr/local/include/firehose"
 
 xcodebuild install \
@@ -31,9 +33,15 @@ xcodebuild install \
   DSTROOT="$B2L_DEPSROOT" \
   CODE_SIGNING_ALLOWED=NO \
   OTHER_CFLAGS='$(inherited) -mcpu=generic -march=armv8-a+crypto' \
+  OTHER_CFLAGS="$(inherited) -mcpu=generic -march=armv8-a+crypto -include $xnu_mach_port" \
   HEADER_SEARCH_PATHS="$header_paths"
 
 archive="$B2L_DEPSROOT/usr/local/lib/kernel/libfirehose_kernel.a"
+# Xcode prepends "lib" to the product name, resulting in liblibfirehose_kernel.a.
+# Normalize that output to the libfirehose_kernel.a name required by -lfirehose_kernel.
+if [[ ! -s "$archive" && -s "$B2L_DEPSROOT/usr/local/lib/kernel/liblibfirehose_kernel.a" ]]; then
+  cp "$B2L_DEPSROOT/usr/local/lib/kernel/liblibfirehose_kernel.a" "$archive"
+fi
 test -s "$archive" || {
   echo "Xcode did not install the expected archive: $archive" >&2
   find "$B2L_DEPSROOT" -name '*firehose*.a' -print >&2
