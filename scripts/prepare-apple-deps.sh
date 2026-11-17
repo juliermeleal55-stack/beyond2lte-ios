@@ -59,7 +59,12 @@ if [[ -d "$KDKROOT/usr/local/include" ]]; then
   ditto "$KDKROOT/usr/local/include" "$deps_root/usr/local/include"
 fi
 mkdir -p "$deps_root/usr/local/include/kernel"
+# Export matching public Mach headers as well as private kernel headers.
+ditto "$kernel_public" "$deps_root/usr/local/include/kernel"
 ditto "$kernel_private" "$deps_root/usr/local/include/kernel"
+test -s "$deps_root/usr/local/include/kernel/mach/port.h" || {
+  echo "Matching XNU mach/port.h was not exported" >&2; exit 1;
+}
 test -d "$deps_root/usr/local/include/os" || {
   echo "Neither XNU nor the matching KDK exported usr/local/include/os; refusing generic headers" >&2; exit 1;
 }
